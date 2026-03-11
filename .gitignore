@@ -46,8 +46,3 @@ app.*.map.json
 
 # API keys
 lib/constants/api_constants.dart
-
-#FIREBASE API KEYS
-lib/firebase_options.dart
-google-services.json
-firebase.json
