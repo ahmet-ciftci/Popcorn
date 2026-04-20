@@ -17,11 +17,13 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _usernameController = TextEditingController();
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _usernameController.dispose();
     super.dispose();
   }
 
@@ -40,10 +42,11 @@ class _LoginScreenState extends State<LoginScreen> {
           password: _passwordController.text,
         );
       } else {
-        await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text,
         );
+        await credential.user?.updateDisplayName(_usernameController.text.trim());
       }
     } on FirebaseAuthException catch (e) {
       setState(() => _errorMessage = _getErrorMessage(e.code));
@@ -98,6 +101,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          if (!_isLogin) ...[
+                            _buildUsernameField(),
+                            const SizedBox(height: 12),
+                          ],
                           _buildEmailField(),
                           const SizedBox(height: 12),
                           _buildPasswordField(),
@@ -212,6 +219,37 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildUsernameField() {
+    return TextFormField(
+      controller: _usernameController,
+      style: const TextStyle(color: Colors.white, fontSize: 14),
+      decoration: InputDecoration(
+        hintText: 'Username',
+        hintStyle: const TextStyle(color: Color(0xFF444444), fontSize: 14),
+        prefixIcon: const Icon(Icons.alternate_email, color: Color(0xFF666666), size: 18),
+        filled: true,
+        fillColor: const Color(0xFF111111),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFE50914), width: 1.5),
+        ),
+        errorStyle: const TextStyle(color: Color(0xFFE50914), fontSize: 11),
+        contentPadding: const EdgeInsets.symmetric(vertical: 14),
+      ),
+      validator: (value) {
+        if (_isLogin) return null;
+        if (value == null || value.isEmpty) return 'Username is required';
+        if (value.length < 3) return 'At least 3 characters required';
+        if (value.contains(' ')) return 'No spaces allowed';
+        return null;
+      },
     );
   }
 
