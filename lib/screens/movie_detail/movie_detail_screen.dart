@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/movie.dart';
 import '../../services/tmdb_service.dart';
+import '../../screens/movie_detail/movie_action_sheet.dart';
 
 class MovieDetailScreen extends StatefulWidget {
   int movieId;
@@ -103,7 +104,19 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       backgroundColor: Color(0xFF0D0D0D),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        elevation: 0,
+        elevation: 0,  actions: [
+        IconButton(
+          icon: const Icon(Icons.more_horiz, color: Colors.white),
+          onPressed: () {
+            showModalBottomSheet(
+              context: context,
+              backgroundColor: Colors.transparent,
+              isScrollControlled: true,
+              builder: (_) => MovieActionSheet(movie: _movie),
+            );
+          },
+        ),
+      ],
       ),
       body: SingleChildScrollView(
         child: Column(
