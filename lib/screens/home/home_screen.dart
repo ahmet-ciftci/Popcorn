@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/movie.dart';
 import '../../services/tmdb_service.dart';
 import '../movie_detail/movie_detail_screen.dart';
+import '../mood/mood_browse_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   HomeScreen({super.key});
@@ -73,9 +73,15 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   IconButton(
-                    icon: Icon(Icons.logout, color: Colors.white),
+                    icon: Icon(Icons.auto_awesome, color: Colors.white),
+                    tooltip: 'Moods',
                     onPressed: () {
-                      FirebaseAuth.instance.signOut();
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => MoodBrowseScreen(),
+                        ),
+                      );
                     },
                   ),
                 ],
