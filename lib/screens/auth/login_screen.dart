@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -37,7 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       if (_isLogin) {
-        await FirebaseAuth.instance.signInWithEmailAndPassword(
+        final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text,
         );
@@ -46,7 +47,21 @@ class _LoginScreenState extends State<LoginScreen> {
           email: _emailController.text.trim(),
           password: _passwordController.text,
         );
+
+        // save display name to Firebase Auth
         await credential.user?.updateDisplayName(_usernameController.text.trim());
+
+        // save user to Firestore
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(credential.user!.uid)
+            .set({
+          'username': _usernameController.text.trim(),
+          'email': _emailController.text.trim(),
+          'createdAt': FieldValue.serverTimestamp(),
+          'followersCount': 0,
+          'followingCount': 0,
+        });
       }
     } on FirebaseAuthException catch (e) {
       setState(() => _errorMessage = _getErrorMessage(e.code));
@@ -116,7 +131,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                 onTap: () {},
                                 child: const Text(
                                   'Forgot Password',
-                                  style: TextStyle(color: Color(0xFF888888), fontSize: 12),
+                                  style: TextStyle(
+                                    color: Color(0xFF888888),
+                                    fontSize: 12,
+                                  ),
                                 ),
                               ),
                             ),
@@ -187,10 +205,16 @@ class _LoginScreenState extends State<LoginScreen> {
       child: Row(
         children: [
           _buildTab('Sign In', isActive: _isLogin, onTap: () {
-            setState(() { _isLogin = true; _errorMessage = null; });
+            setState(() {
+              _isLogin = true;
+              _errorMessage = null;
+            });
           }),
           _buildTab('Sign Up', isActive: !_isLogin, onTap: () {
-            setState(() { _isLogin = false; _errorMessage = null; });
+            setState(() {
+              _isLogin = false;
+              _errorMessage = null;
+            });
           }),
         ],
       ),
@@ -229,7 +253,11 @@ class _LoginScreenState extends State<LoginScreen> {
       decoration: InputDecoration(
         hintText: 'Username',
         hintStyle: const TextStyle(color: Color(0xFF444444), fontSize: 14),
-        prefixIcon: const Icon(Icons.alternate_email, color: Color(0xFF666666), size: 18),
+        prefixIcon: const Icon(
+          Icons.alternate_email,
+          color: Color(0xFF666666),
+          size: 18,
+        ),
         filled: true,
         fillColor: const Color(0xFF111111),
         border: OutlineInputBorder(
@@ -261,7 +289,11 @@ class _LoginScreenState extends State<LoginScreen> {
       decoration: InputDecoration(
         hintText: 'Email',
         hintStyle: const TextStyle(color: Color(0xFF444444), fontSize: 14),
-        prefixIcon: const Icon(Icons.mail_outline, color: Color(0xFF666666), size: 18),
+        prefixIcon: const Icon(
+          Icons.mail_outline,
+          color: Color(0xFF666666),
+          size: 18,
+        ),
         filled: true,
         fillColor: const Color(0xFF111111),
         border: OutlineInputBorder(
@@ -291,10 +323,16 @@ class _LoginScreenState extends State<LoginScreen> {
       decoration: InputDecoration(
         hintText: 'Password',
         hintStyle: const TextStyle(color: Color(0xFF444444), fontSize: 14),
-        prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF666666), size: 18),
+        prefixIcon: const Icon(
+          Icons.lock_outline,
+          color: Color(0xFF666666),
+          size: 18,
+        ),
         suffixIcon: IconButton(
           icon: Icon(
-            _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+            _obscurePassword
+                ? Icons.visibility_outlined
+                : Icons.visibility_off_outlined,
             color: const Color(0xFF666666),
             size: 18,
           ),
@@ -327,7 +365,9 @@ class _LoginScreenState extends State<LoginScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFFE50914).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE50914).withValues(alpha: 0.4)),
+        border: Border.all(
+          color: const Color(0xFFE50914).withValues(alpha: 0.4),
+        ),
       ),
       child: Row(
         children: [
@@ -359,7 +399,10 @@ class _LoginScreenState extends State<LoginScreen> {
               ? const SizedBox(
             width: 18,
             height: 18,
-            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Colors.white,
+            ),
           )
               : Text(
             _isLogin ? 'Sign In' : 'Create Account',
