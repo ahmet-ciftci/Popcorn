@@ -46,4 +46,82 @@ class TMDBService {
       return null;
     }
   }
+
+  // get trending movies this week
+  Future<List<Movie>?> getTrendingMoviesWeek() async {
+    final url = Uri.parse(
+      '${ApiConstants.baseUrl}/trending/movie/week?api_key=${ApiConstants.apiKey}',
+    );
+
+    try {
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        List<Movie> movies = [];
+        for (var item in data['results']) {
+          movies.add(Movie.fromJson(item));
+        }
+        return movies;
+      } else {
+        print('Failed to load trending: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('Error: $e');
+      return null;
+    }
+  }
+
+  // get popular movies
+  Future<List<Movie>?> getPopularMovies() async {
+    final url = Uri.parse(
+      '${ApiConstants.baseUrl}/movie/popular?api_key=${ApiConstants.apiKey}',
+    );
+
+    try {
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        List<Movie> movies = [];
+        for (var item in data['results']) {
+          movies.add(Movie.fromJson(item));
+        }
+        return movies;
+      } else {
+        print('Failed to load popular: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('Error: $e');
+      return null;
+    }
+  }
+
+  // discover movies by genres + sort
+  Future<List<Movie>?> discoverMovies(List<int> genreIds, String sortBy) async {
+    final url = Uri.parse(
+      '${ApiConstants.baseUrl}/discover/movie?api_key=${ApiConstants.apiKey}&with_genres=${genreIds.join(',')}&sort_by=$sortBy',
+    );
+
+    try {
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        List<Movie> movies = [];
+        for (var item in data['results']) {
+          movies.add(Movie.fromJson(item));
+        }
+        return movies;
+      } else {
+        print('Failed to discover movies: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('Error: $e');
+      return null;
+    }
+  }
 }
