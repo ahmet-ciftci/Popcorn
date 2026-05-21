@@ -4,6 +4,7 @@ import '../../models/movie.dart';
 import '../../services/tmdb_service.dart';
 import '../../services/social_service.dart';
 import '../movie_detail/movie_detail_screen.dart';
+import '../profile/user_profile_screen.dart';
 
 class SearchScreen extends StatefulWidget {
   SearchScreen({super.key});
@@ -15,15 +16,12 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen>
     with SingleTickerProviderStateMixin {
 
-  // tab controller — Movies / People
   late TabController _tabController;
 
-  // movie search
   List<Movie> _movieResults = [];
   bool _movieLoading = false;
   bool _movieHasSearched = false;
 
-  // people search
   List<Map<String, dynamic>> _peopleResults = [];
   bool _peopleLoading = false;
   bool _peopleHasSearched = false;
@@ -38,7 +36,7 @@ class _SearchScreenState extends State<SearchScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
 
-
+    // when tab changes, search with the same query
     _tabController.addListener(() {
       final query = _searchController.text.trim();
       if (query.isEmpty) return;
@@ -135,21 +133,21 @@ class _SearchScreenState extends State<SearchScreen>
               ),
             ),
 
-            // tabs
+            // Movies / People tabs
             TabBar(
               controller: _tabController,
               indicatorColor: const Color(0xFFE50914),
               indicatorWeight: 2,
               labelColor: Colors.white,
               unselectedLabelColor: Colors.grey,
-              labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              labelStyle: const TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w600),
               tabs: const [
                 Tab(text: 'Movies'),
                 Tab(text: 'People'),
               ],
             ),
 
-            // tab içeriği
             Expanded(
               child: TabBarView(
                 controller: _tabController,
@@ -221,7 +219,8 @@ class _SearchScreenState extends State<SearchScreen>
                     width: 60,
                     height: 90,
                     color: const Color(0xFF222222),
-                    child: const Icon(Icons.movie_outlined, color: Colors.grey),
+                    child: const Icon(Icons.movie_outlined,
+                        color: Colors.grey),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -242,16 +241,20 @@ class _SearchScreenState extends State<SearchScreen>
                       ),
                       if (year.isNotEmpty) ...[
                         const SizedBox(height: 4),
-                        Text(year, style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                        Text(year,
+                            style: const TextStyle(
+                                color: Colors.grey, fontSize: 13)),
                       ],
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          const Icon(Icons.star, color: Color(0xFFE50914), size: 14),
+                          const Icon(Icons.star,
+                              color: Color(0xFFE50914), size: 14),
                           const SizedBox(width: 4),
                           Text(
                             movie.voteAverage.toStringAsFixed(1),
-                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 13),
                           ),
                         ],
                       ),
@@ -289,70 +292,71 @@ class _SearchScreenState extends State<SearchScreen>
       itemBuilder: (context, index) {
         final user = _peopleResults[index];
         final username = user['username'] ?? '';
-        final initial = username.isNotEmpty ? username[0].toUpperCase() : '?';
+        final initial =
+        username.isNotEmpty ? username[0].toUpperCase() : '?';
         final followersCount = user['followersCount'] ?? 0;
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFF111111),
-            borderRadius: BorderRadius.circular(12),
+        // tapping the card goes to that user's profile
+        return GestureDetector(
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => UserProfileScreen(
+                uid: user['uid'],
+                username: username,
+              ),
+            ),
           ),
-          child: Row(
-            children: [
-              // avatar
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: const Color(0xFFE50914),
-                child: Text(
-                  initial,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF111111),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                // avatar
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: const Color(0xFFE50914),
+                  child: Text(
+                    initial,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              // info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      username,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
+                const SizedBox(width: 12),
+                // username + followers
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        username,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '$followersCount followers',
-                      style: const TextStyle(color: Colors.grey, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-              // follow butonu — ileride aktif edilecek
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                decoration: BoxDecoration(
-                  border: Border.all(color: const Color(0xFFE50914)),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Text(
-                  'Follow',
-                  style: TextStyle(
-                    color: Color(0xFFE50914),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                      const SizedBox(height: 2),
+                      Text(
+                        '$followersCount followers',
+                        style: const TextStyle(
+                            color: Colors.grey, fontSize: 12),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            ],
+                // arrow icon — shows the card is tappable
+                Icon(Icons.chevron_right,
+                    color: Colors.grey.shade700, size: 20),
+              ],
+            ),
           ),
         );
       },
@@ -366,7 +370,8 @@ class _SearchScreenState extends State<SearchScreen>
         children: [
           Icon(icon, color: Colors.grey, size: 48),
           const SizedBox(height: 16),
-          Text(message, style: const TextStyle(color: Colors.grey, fontSize: 15)),
+          Text(message,
+              style: const TextStyle(color: Colors.grey, fontSize: 15)),
         ],
       ),
     );

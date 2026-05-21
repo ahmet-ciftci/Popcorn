@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../settings/settings_screen.dart';
 import '../../services/firestore_service.dart';
 import '../../services/tmdb_service.dart';
@@ -32,8 +33,9 @@ class _ProfileScreenState extends State<ProfileScreen>
   List<Map<String, dynamic>> _watched = [];
   List<Map<String, dynamic>> _watchlist = [];
   List<Map<String, dynamic>> _lists = [];
-  // 4 slot, boş = null
   List<Map<String, dynamic>?> _favorites = [null, null, null, null];
+  int _followersCount = 0;
+  int _followingCount = 0;
   bool _loading = true;
 
   @override
@@ -50,12 +52,22 @@ class _ProfileScreenState extends State<ProfileScreen>
       _firestoreService.getLists(),
       _firestoreService.getFavorites(),
     ]);
+
+    // load followers/following from Firestore
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(_user?.uid)
+        .get();
+    final userData = userDoc.data();
+
     if (mounted) {
       setState(() {
         _watched = results[0] as List<Map<String, dynamic>>;
         _watchlist = results[1] as List<Map<String, dynamic>>;
         _lists = results[2] as List<Map<String, dynamic>>;
         _favorites = results[3] as List<Map<String, dynamic>?>;
+        _followersCount = userData?['followersCount'] ?? 0;
+        _followingCount = userData?['followingCount'] ?? 0;
         _loading = false;
       });
     }
@@ -66,10 +78,9 @@ class _ProfileScreenState extends State<ProfileScreen>
     if (mounted) setState(() => _favorites = favorites);
   }
 
-  // + ikonuna basınca → boş slotu bul, sheet aç
   void _onAddFavorite() {
     final emptySlot = _favorites.indexWhere((f) => f == null);
-    if (emptySlot == -1) return; // 4 slot dolu
+    if (emptySlot == -1) return;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -81,7 +92,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  // Uzun basınca → kaldır
   Future<void> _onRemoveFavorite(int slot) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -158,7 +168,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                         movies: _watched,
                         emptyMessage: 'no watched films yet',
                         label: 'FILMS'),
-                    _ListsTab(lists: _lists, onListsChanged: _loadAll),
+                    _ListsTab(
+                        lists: _lists, onListsChanged: _loadAll),
                     _MovieGridTab(
                         movies: _watchlist,
                         emptyMessage: 'no watchlist yet',
@@ -177,10 +188,9 @@ class _ProfileScreenState extends State<ProfileScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Top bar ──
+        // top bar
         Padding(
-          padding:
-          const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           child: Stack(
             alignment: Alignment.center,
             children: [
@@ -193,8 +203,10 @@ class _ProfileScreenState extends State<ProfileScreen>
               Align(
                 alignment: Alignment.centerRight,
                 child: GestureDetector(
-                  onTap: () => Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const SettingsScreen())),
+                  onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const SettingsScreen())),
                   child: const Icon(Icons.settings_outlined,
                       color: Colors.white, size: 22),
                 ),
@@ -203,7 +215,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           ),
         ),
 
-        // ── Avatar + stats ──
+        // avatar + stats
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Row(
@@ -224,8 +236,12 @@ class _ProfileScreenState extends State<ProfileScreen>
                   children: [
                     _StatItem(
                         label: 'watched', value: '${_watched.length}'),
-                    const _StatItem(label: 'followers', value: '0'),
-                    const _StatItem(label: 'following', value: '0'),
+                    _StatItem(
+                        label: 'followers',
+                        value: '$_followersCount'),
+                    _StatItem(
+                        label: 'following',
+                        value: '$_followingCount'),
                   ],
                 ),
               ),
@@ -246,7 +262,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
         const SizedBox(height: 14),
 
-        // ── Buttons ──
+        // buttons
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Row(
@@ -282,7 +298,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
         const SizedBox(height: 24),
 
-        // ── Favorites ──
+        // favorites
         _SectionHeader(title: 'favorites'),
         const SizedBox(height: 12),
         Padding(
@@ -292,7 +308,8 @@ class _ProfileScreenState extends State<ProfileScreen>
               final fav = _favorites[i];
               final hasMovie = fav != null;
               final posterPath = fav?['posterPath'] as String?;
-              final posterUrl = (posterPath != null && posterPath.isNotEmpty)
+              final posterUrl =
+              (posterPath != null && posterPath.isNotEmpty)
                   ? 'https://image.tmdb.org/t/p/w185$posterPath'
                   : '';
 
@@ -302,7 +319,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                   child: AspectRatio(
                     aspectRatio: 2 / 3,
                     child: hasMovie
-                    // ── Dolu slot: tıkla → değiştir, uzun bas → kaldır ──
                         ? GestureDetector(
                       onTap: () => showModalBottomSheet(
                         context: context,
@@ -334,9 +350,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 color: Colors.grey.shade700)),
                       ),
                     )
-                    // ── Boş slot: + ikonu, sadece ilk boşa tıklanabilir ──
                         : GestureDetector(
-                      onTap: _favorites.indexWhere((f) => f == null) == i
+                      onTap:
+                      _favorites.indexWhere((f) => f == null) == i
                           ? _onAddFavorite
                           : null,
                       child: Container(
@@ -347,7 +363,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                               color: const Color(0xFF2A2A2A),
                               width: 0.5),
                         ),
-                        child: _favorites.indexWhere((f) => f == null) == i
+                        child: _favorites
+                            .indexWhere((f) => f == null) ==
+                            i
                             ? Icon(Icons.add,
                             color: Colors.grey.shade700, size: 20)
                             : null,
@@ -364,13 +382,10 @@ class _ProfileScreenState extends State<ProfileScreen>
       ],
     );
   }
-
-
 }
 
-// ─────────────────────────────────────────────
-// Favorites Search Sheet
-// ─────────────────────────────────────────────
+// ── Favorites Search Sheet ──
+
 class _FavoritesSearchSheet extends StatefulWidget {
   final int slot;
   final VoidCallback onAdded;
@@ -396,10 +411,12 @@ class _FavoritesSearchSheetState extends State<_FavoritesSearchSheet> {
     }
     setState(() => _searching = true);
     final results = await _tmdbService.searchMovies(query, 1);
-    if (mounted) setState(() {
-      _results = results;
-      _searching = false;
-    });
+    if (mounted) {
+      setState(() {
+        _results = results;
+        _searching = false;
+      });
+    }
   }
 
   Future<void> _select(Movie movie) async {
@@ -424,25 +441,21 @@ class _FavoritesSearchSheetState extends State<_FavoritesSearchSheet> {
       ),
       child: Column(
         children: [
-          // drag handle
           Container(
-            width: 36, height: 4,
+            width: 36,
+            height: 4,
             margin: const EdgeInsets.symmetric(vertical: 12),
             decoration: BoxDecoration(
               color: const Color(0xFF3A3A3C),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-
           const Text('add to favorites',
               style: TextStyle(
                   color: Colors.white,
                   fontSize: 14,
                   fontWeight: FontWeight.w600)),
-
           const SizedBox(height: 14),
-
-          // search box
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14),
             child: Container(
@@ -457,20 +470,20 @@ class _FavoritesSearchSheetState extends State<_FavoritesSearchSheet> {
                 cursorColor: const Color(0xFFE50914),
                 decoration: InputDecoration(
                   hintText: 'search films...',
-                  hintStyle: TextStyle(color: Colors.grey.shade600, fontSize: 14),
-                  prefixIcon: Icon(Icons.search, color: Colors.grey.shade600, size: 20),
+                  hintStyle: TextStyle(
+                      color: Colors.grey.shade600, fontSize: 14),
+                  prefixIcon: Icon(Icons.search,
+                      color: Colors.grey.shade600, size: 20),
                   border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  contentPadding:
+                  const EdgeInsets.symmetric(vertical: 12),
                 ),
                 onChanged: (val) => _search(val),
               ),
             ),
           ),
-
           const SizedBox(height: 8),
           Container(height: 0.5, color: const Color(0xFF2C2C2E)),
-
-          // results
           Expanded(
             child: _searching
                 ? const Center(
@@ -507,33 +520,42 @@ class _FavoritesSearchSheetState extends State<_FavoritesSearchSheet> {
                           horizontal: 14, vertical: 10),
                       child: Row(
                         children: [
-                          // mini poster
                           ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
+                            borderRadius:
+                            BorderRadius.circular(4),
                             child: posterUrl.isNotEmpty
                                 ? CachedNetworkImage(
                               imageUrl: posterUrl,
                               width: 36,
                               height: 54,
                               fit: BoxFit.cover,
-                              placeholder: (_, __) => Container(
-                                width: 36, height: 54,
-                                color: const Color(0xFF2C2C2E),
-                              ),
+                              placeholder: (_, __) =>
+                                  Container(
+                                    width: 36,
+                                    height: 54,
+                                    color: const Color(
+                                        0xFF2C2C2E),
+                                  ),
                               errorWidget: (_, __, ___) =>
                                   Container(
-                                    width: 36, height: 54,
-                                    color: const Color(0xFF2C2C2E),
+                                    width: 36,
+                                    height: 54,
+                                    color: const Color(
+                                        0xFF2C2C2E),
                                     child: Icon(Icons.movie,
-                                        color: Colors.grey.shade700,
+                                        color: Colors
+                                            .grey.shade700,
                                         size: 16),
                                   ),
                             )
                                 : Container(
-                              width: 36, height: 54,
-                              color: const Color(0xFF2C2C2E),
+                              width: 36,
+                              height: 54,
+                              color:
+                              const Color(0xFF2C2C2E),
                               child: Icon(Icons.movie,
-                                  color: Colors.grey.shade700,
+                                  color:
+                                  Colors.grey.shade700,
                                   size: 16),
                             ),
                           ),
@@ -547,14 +569,17 @@ class _FavoritesSearchSheetState extends State<_FavoritesSearchSheet> {
                                     style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 13,
-                                        fontWeight: FontWeight.w500),
+                                        fontWeight:
+                                        FontWeight.w500),
                                     maxLines: 2,
-                                    overflow: TextOverflow.ellipsis),
+                                    overflow:
+                                    TextOverflow.ellipsis),
                                 if (year.isNotEmpty) ...[
                                   const SizedBox(height: 3),
                                   Text(year,
                                       style: TextStyle(
-                                          color: Colors.grey.shade600,
+                                          color: Colors
+                                              .grey.shade600,
                                           fontSize: 11)),
                                 ],
                               ],
@@ -577,9 +602,8 @@ class _FavoritesSearchSheetState extends State<_FavoritesSearchSheet> {
   }
 }
 
-// ─────────────────────────────────────────────
-// Movie Grid Tab
-// ─────────────────────────────────────────────
+// ── Movie Grid Tab ──
+
 class _MovieGridTab extends StatelessWidget {
   final List<Map<String, dynamic>> movies;
   final String emptyMessage;
@@ -601,18 +625,20 @@ class _MovieGridTab extends StatelessWidget {
     if (movies.isEmpty) {
       return Center(
         child: Text(emptyMessage,
-            style: TextStyle(color: Colors.grey.shade700, fontSize: 14)),
+            style:
+            TextStyle(color: Colors.grey.shade700, fontSize: 14)),
       );
     }
 
     return ScrollConfiguration(
-      behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+      behavior:
+      ScrollConfiguration.of(context).copyWith(scrollbars: false),
       child: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(
             child: Padding(
-              padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 16, vertical: 14),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -626,15 +652,16 @@ class _MovieGridTab extends StatelessWidget {
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) =>
-                            _AllMoviesScreen(movies: movies, title: label),
+                        builder: (_) => _AllMoviesScreen(
+                            movies: movies, title: label),
                       ),
                     ),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
-                        border: Border.all(color: const Color(0xFFE50914)),
+                        border: Border.all(
+                            color: const Color(0xFFE50914)),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: const Row(
@@ -644,7 +671,8 @@ class _MovieGridTab extends StatelessWidget {
                           SizedBox(width: 5),
                           Text('See All',
                               style: TextStyle(
-                                  color: Color(0xFFE50914), fontSize: 12)),
+                                  color: Color(0xFFE50914),
+                                  fontSize: 12)),
                         ],
                       ),
                     ),
@@ -691,9 +719,8 @@ class _MovieGridTab extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────
-// See All → Full Screen
-// ─────────────────────────────────────────────
+// ── See All Screen ──
+
 class _AllMoviesScreen extends StatelessWidget {
   final List<Map<String, dynamic>> movies;
   final String title;
@@ -729,7 +756,8 @@ class _AllMoviesScreen extends StatelessWidget {
         child: GridView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: movies.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          gridDelegate:
+          const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 3,
             crossAxisSpacing: 8,
             mainAxisSpacing: 8,
@@ -741,8 +769,8 @@ class _AllMoviesScreen extends StatelessWidget {
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) =>
-                      MovieDetailScreen(movieId: movie['tmdbId'] as int),
+                  builder: (_) => MovieDetailScreen(
+                      movieId: movie['tmdbId'] as int),
                 ),
               ),
               child: _PosterCard(
@@ -757,9 +785,8 @@ class _AllMoviesScreen extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────
-// Lists Tab
-// ─────────────────────────────────────────────
+// ── Lists Tab ──
+
 class _ListsTab extends StatelessWidget {
   final List<Map<String, dynamic>> lists;
   final VoidCallback onListsChanged;
@@ -771,12 +798,14 @@ class _ListsTab extends StatelessWidget {
     if (lists.isEmpty) {
       return Center(
         child: Text('no lists yet',
-            style: TextStyle(color: Colors.grey.shade700, fontSize: 14)),
+            style:
+            TextStyle(color: Colors.grey.shade700, fontSize: 14)),
       );
     }
 
     return ScrollConfiguration(
-      behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+      behavior:
+      ScrollConfiguration.of(context).copyWith(scrollbars: false),
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         itemCount: lists.length,
@@ -797,8 +826,8 @@ class _ListsTab extends StatelessWidget {
               if (result != null) onListsChanged();
             },
             child: Container(
-              padding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 14, vertical: 14),
               decoration: BoxDecoration(
                 color: const Color(0xFF1A1A1A),
                 borderRadius: BorderRadius.circular(10),
@@ -806,9 +835,11 @@ class _ListsTab extends StatelessWidget {
               child: Row(
                 children: [
                   Container(
-                    width: 36, height: 36,
+                    width: 36,
+                    height: 36,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE50914).withValues(alpha: 0.15),
+                      color: const Color(0xFFE50914)
+                          .withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Icon(Icons.list,
@@ -834,9 +865,8 @@ class _ListsTab extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────
-// Poster Card
-// ─────────────────────────────────────────────
+// ── Poster Card ──
+
 class _PosterCard extends StatelessWidget {
   final String posterUrl;
   final int? rating;
@@ -874,10 +904,12 @@ class _PosterCard extends StatelessWidget {
           ),
           if (rating != null && rating! > 0)
             Positioned(
-              bottom: 0, left: 0, right: 0,
+              bottom: 0,
+              left: 0,
+              right: 0,
               child: Container(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 4, vertical: 4),
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.bottomCenter,
@@ -905,9 +937,8 @@ class _PosterCard extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────
-// Pinned Tab Bar Delegate
-// ─────────────────────────────────────────────
+// ── Tab Bar Delegate ──
+
 class _TabBarDelegate extends SliverPersistentHeaderDelegate {
   final TabBar tabBar;
   const _TabBarDelegate(this.tabBar);
@@ -935,9 +966,8 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
   bool shouldRebuild(_TabBarDelegate oldDelegate) => false;
 }
 
-// ─────────────────────────────────────────────
-// Reusable Widgets
-// ─────────────────────────────────────────────
+// ── Reusable Widgets ──
+
 class _StatItem extends StatelessWidget {
   final String label;
   final String value;
@@ -954,7 +984,8 @@ class _StatItem extends StatelessWidget {
                 fontWeight: FontWeight.w700)),
         const SizedBox(height: 3),
         Text(label,
-            style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+            style:
+            TextStyle(color: Colors.grey.shade500, fontSize: 12)),
       ],
     );
   }
@@ -1005,8 +1036,8 @@ class _SectionHeader extends StatelessWidget {
                   letterSpacing: 1.0)),
           const SizedBox(width: 10),
           Expanded(
-              child:
-              Container(height: 0.5, color: const Color(0xFF2A2A2A))),
+              child: Container(
+                  height: 0.5, color: const Color(0xFF2A2A2A))),
         ],
       ),
     );

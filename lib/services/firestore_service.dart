@@ -127,7 +127,7 @@ class FirestoreService {
     });
   }
 
-  // Favorilerden kaldır
+
   Future<void> removeFromFavorites(int slot) async {
     await _db
         .collection('users')
@@ -137,7 +137,6 @@ class FirestoreService {
         .delete();
   }
 
-  // Favorileri getir (slot sırasına göre, 4 slot: 0-3)
   Future<List<Map<String, dynamic>?>> getFavorites() async {
     final snapshot = await _db
         .collection('users')
@@ -145,7 +144,6 @@ class FirestoreService {
         .collection('favorites')
         .get();
 
-    // 4 slotluk liste, boş slotlar null
     final List<Map<String, dynamic>?> slots = [null, null, null, null];
     for (final doc in snapshot.docs) {
       final slot = int.tryParse(doc.id);

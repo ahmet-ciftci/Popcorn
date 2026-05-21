@@ -26,6 +26,8 @@ class SocialService {
 
   // follow a user
   Future<void> follow(String targetUid) async {
+    print('Current user (following): $_uid');
+    print('Target user (followers): $targetUid');
     final batch = _db.batch();
 
     batch.set(
@@ -39,15 +41,14 @@ class SocialService {
     );
 
     batch.update(
-      _db.collection('users').doc(_uid),
-      {'followingCount': FieldValue.increment(1)},
-    );
-
-    batch.update(
       _db.collection('users').doc(targetUid),
       {'followersCount': FieldValue.increment(1)},
     );
 
+    batch.update(
+      _db.collection('users').doc(_uid),
+      {'followingCount': FieldValue.increment(1)},
+    );
     await batch.commit();
   }
 

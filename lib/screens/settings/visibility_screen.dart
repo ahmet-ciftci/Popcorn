@@ -1,5 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class VisibilityScreen extends StatefulWidget {
   const VisibilityScreen({super.key});
@@ -9,6 +11,10 @@ class VisibilityScreen extends StatefulWidget {
 }
 
 class _VisibilityScreenState extends State<VisibilityScreen> {
+  final _db = FirebaseFirestore.instance;
+  String get _uid => FirebaseAuth.instance.currentUser!.uid;
+
+  // default values
   final Map<String, String> _settings = {
     'Profile Visibility': 'Everyone',
     'Watched List': 'Everyone',
@@ -18,6 +24,41 @@ class _VisibilityScreenState extends State<VisibilityScreen> {
     'Custom Lists': 'Everyone',
     'Followers List': 'Everyone',
   };
+
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  // load saved settings from Firestore
+  Future<void> _loadSettings() async {
+    final doc = await _db.collection('users').doc(_uid).get();
+    final data = doc.data();
+
+    if (data != null && data['visibility'] != null) {
+      final saved = Map<String, String>.from(data['visibility']);
+      setState(() {
+        saved.forEach((key, value) {
+          if (_settings.containsKey(key)) {
+            _settings[key] = value;
+          }
+        });
+      });
+    }
+
+    setState(() => _loading = false);
+  }
+
+  // save a single setting to Firestore
+  Future<void> _saveSetting(String key, String value) async {
+    await _db.collection('users').doc(_uid).update({
+      'visibility.$key': value,
+    });
+    setState(() => _settings[key] = value);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,15 +70,20 @@ class _VisibilityScreenState extends State<VisibilityScreen> {
         backgroundColor: const Color(0xFF0D0D0D),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(CupertinoIcons.chevron_back, color: Colors.white, size: 20),
+          icon: const Icon(CupertinoIcons.chevron_back,
+              color: Colors.white, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Visibility',
-          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+          style: TextStyle(
+              color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),
-      body: ListView(
+      body: _loading
+          ? const Center(
+          child: CircularProgressIndicator(color: Color(0xFFE50914)))
+          : ListView(
         padding: const EdgeInsets.all(16),
         children: [
           Container(
@@ -56,17 +102,22 @@ class _VisibilityScreenState extends State<VisibilityScreen> {
                     ListTile(
                       title: Text(
                         key,
-                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 14),
                       ),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
                             _settings[key]!,
-                            style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                            style: TextStyle(
+                                color: Colors.grey.shade600,
+                                fontSize: 13),
                           ),
                           const SizedBox(width: 4),
-                          Icon(CupertinoIcons.chevron_right, size: 13, color: Colors.grey.shade700),
+                          Icon(CupertinoIcons.chevron_right,
+                              size: 13,
+                              color: Colors.grey.shade700),
                         ],
                       ),
                       onTap: () async {
@@ -79,16 +130,17 @@ class _VisibilityScreenState extends State<VisibilityScreen> {
                             ),
                           ),
                         );
-
                         if (result != null) {
-                          setState(() => _settings[key] = result);
+                          await _saveSetting(key, result);
                         }
                       },
                     ),
                     if (!isLast)
                       Padding(
                         padding: const EdgeInsets.only(left: 16),
-                        child: Container(height: 0.5, color: const Color(0xFF2C2C2E)),
+                        child: Container(
+                            height: 0.5,
+                            color: const Color(0xFF2C2C2E)),
                       ),
                   ],
                 );
@@ -101,7 +153,8 @@ class _VisibilityScreenState extends State<VisibilityScreen> {
   }
 }
 
-// (Everyone / Friends / Only Me)
+// ── Option screen — Everyone / Friends / Only Me ──
+
 class _VisibilityOptionScreen extends StatefulWidget {
   final String title;
   final String currentValue;
@@ -112,7 +165,8 @@ class _VisibilityOptionScreen extends StatefulWidget {
   });
 
   @override
-  State<_VisibilityOptionScreen> createState() => _VisibilityOptionScreenState();
+  State<_VisibilityOptionScreen> createState() =>
+      _VisibilityOptionScreenState();
 }
 
 class _VisibilityOptionScreenState extends State<_VisibilityOptionScreen> {
@@ -132,12 +186,14 @@ class _VisibilityOptionScreenState extends State<_VisibilityOptionScreen> {
         backgroundColor: const Color(0xFF0D0D0D),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(CupertinoIcons.chevron_back, color: Colors.white, size: 20),
+          icon: const Icon(CupertinoIcons.chevron_back,
+              color: Colors.white, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           widget.title,
-          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+          style: const TextStyle(
+              color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),
       body: Padding(
@@ -176,18 +232,23 @@ class _VisibilityOptionScreenState extends State<_VisibilityOptionScreen> {
 
             const SizedBox(height: 24),
 
+            // save button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFE50914),
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
                 onPressed: () => Navigator.pop(context, _selected),
                 child: const Text(
                   'Save',
-                  style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600),
                 ),
               ),
             ),
@@ -219,7 +280,8 @@ class _VisibilityOptionScreenState extends State<_VisibilityOptionScreen> {
           ),
           title: Text(
             label,
-            style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+            style: const TextStyle(
+                color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
           ),
           subtitle: Text(
             description,
@@ -231,7 +293,9 @@ class _VisibilityOptionScreenState extends State<_VisibilityOptionScreen> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: isSelected ? const Color(0xFFE50914) : Colors.transparent,
-              border: isSelected ? null : Border.all(color: Colors.grey.shade700, width: 1.5),
+              border: isSelected
+                  ? null
+                  : Border.all(color: Colors.grey.shade700, width: 1.5),
             ),
             child: isSelected
                 ? const Icon(Icons.check, size: 14, color: Colors.white)
