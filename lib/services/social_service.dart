@@ -6,6 +6,7 @@ class SocialService {
 
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
 
+  // search users by username
   Future<List<Map<String, dynamic>>> searchUsers(String query) async {
     if (query.trim().isEmpty) return [];
 
@@ -21,35 +22,88 @@ class SocialService {
 
     return snapshot.docs
         .map((doc) => {'uid': doc.id, ...doc.data()})
+        .where((user) => user['uid'] != currentUid)
         .toList();
   }
 
-  // follow a user
-  Future<void> follow(String targetUid) async {
-    print('Current user (following): $_uid');
-    print('Target user (followers): $targetUid');
-    final batch = _db.batch();
+  // follow or send request depending on target's privacy setting
+  Future<String> follow(String targetUid) async {
+    // check target user's profile visibility
+    final targetDoc = await _db.collection('users').doc(targetUid).get();
+    final targetData = targetDoc.data();
+    final visibility = targetData?['visibility'];
+    final profileVisibility = visibility?['Profile Visibility'] ?? 'Everyone';
 
-    batch.set(
-      _db.collection('users').doc(_uid).collection('following').doc(targetUid),
-      {'uid': targetUid, 'followedAt': FieldValue.serverTimestamp()},
-    );
+    // get current user's username
+    final currentDoc = await _db.collection('users').doc(_uid).get();
+    final username = currentDoc.data()?['username'] ?? '';
 
-    batch.set(
-      _db.collection('users').doc(targetUid).collection('followers').doc(_uid),
-      {'uid': _uid, 'followedAt': FieldValue.serverTimestamp()},
-    );
+    if (profileVisibility == 'Everyone') {
+      // public profile — follow directly
+      final batch = _db.batch();
 
-    batch.update(
-      _db.collection('users').doc(targetUid),
-      {'followersCount': FieldValue.increment(1)},
-    );
+      batch.set(
+        _db.collection('users').doc(_uid).collection('following').doc(targetUid),
+        {'uid': targetUid, 'followedAt': FieldValue.serverTimestamp()},
+      );
+      batch.set(
+        _db.collection('users').doc(targetUid).collection('followers').doc(_uid),
+        {'uid': _uid, 'followedAt': FieldValue.serverTimestamp()},
+      );
+      batch.update(
+        _db.collection('users').doc(_uid),
+        {'followingCount': FieldValue.increment(1)},
+      );
+      batch.update(
+        _db.collection('users').doc(targetUid),
+        {'followersCount': FieldValue.increment(1)},
+      );
 
-    batch.update(
-      _db.collection('users').doc(_uid),
-      {'followingCount': FieldValue.increment(1)},
-    );
-    await batch.commit();
+      // send follow notification
+      batch.set(
+        _db.collection('notifications').doc(targetUid).collection('items').doc(),
+        {
+          'type': 'follow',
+          'fromUid': _uid,
+          'fromUsername': username,
+          'read': false,
+          'createdAt': FieldValue.serverTimestamp(),
+        },
+      );
+
+      await batch.commit();
+      return 'followed'; // directly followed
+
+    } else {
+      // private profile — send follow request
+      await _db
+          .collection('users')
+          .doc(targetUid)
+          .collection('followRequests')
+          .doc(_uid)
+          .set({
+        'fromUid': _uid,
+        'fromUsername': username,
+        'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      // send follow request notification
+      await _db
+          .collection('notifications')
+          .doc(targetUid)
+          .collection('items')
+          .doc()
+          .set({
+        'type': 'follow_request',
+        'fromUid': _uid,
+        'fromUsername': username,
+        'read': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      return 'requested'; // request sent
+    }
   }
 
   // unfollow a user
@@ -62,12 +116,10 @@ class SocialService {
     batch.delete(
       _db.collection('users').doc(targetUid).collection('followers').doc(_uid),
     );
-
     batch.update(
       _db.collection('users').doc(_uid),
       {'followingCount': FieldValue.increment(-1)},
     );
-
     batch.update(
       _db.collection('users').doc(targetUid),
       {'followersCount': FieldValue.increment(-1)},
@@ -76,7 +128,91 @@ class SocialService {
     await batch.commit();
   }
 
-  // check if current user is following target
+  // cancel a follow request
+  Future<void> cancelRequest(String targetUid) async {
+    await _db
+        .collection('users')
+        .doc(targetUid)
+        .collection('followRequests')
+        .doc(_uid)
+        .delete();
+  }
+
+  // check follow status — 'following', 'requested', or 'none'
+  Future<String> getFollowStatus(String targetUid) async {
+    final followDoc = await _db
+        .collection('users')
+        .doc(_uid)
+        .collection('following')
+        .doc(targetUid)
+        .get();
+    if (followDoc.exists) return 'following';
+
+    final requestDoc = await _db
+        .collection('users')
+        .doc(targetUid)
+        .collection('followRequests')
+        .doc(_uid)
+        .get();
+    if (requestDoc.exists) return 'requested';
+
+    return 'none';
+  }
+
+  // accept a follow request
+  Future<void> acceptRequest(String fromUid) async {
+    final batch = _db.batch();
+
+    // add to followers/following
+    batch.set(
+      _db.collection('users').doc(_uid).collection('followers').doc(fromUid),
+      {'uid': fromUid, 'followedAt': FieldValue.serverTimestamp()},
+    );
+    batch.set(
+      _db.collection('users').doc(fromUid).collection('following').doc(_uid),
+      {'uid': _uid, 'followedAt': FieldValue.serverTimestamp()},
+    );
+    batch.update(
+      _db.collection('users').doc(_uid),
+      {'followersCount': FieldValue.increment(1)},
+    );
+    batch.update(
+      _db.collection('users').doc(fromUid),
+      {'followingCount': FieldValue.increment(1)},
+    );
+
+    // delete the request
+    batch.delete(
+      _db.collection('users').doc(_uid).collection('followRequests').doc(fromUid),
+    );
+
+    await batch.commit();
+  }
+
+  // decline a follow request
+  Future<void> declineRequest(String fromUid) async {
+    await _db
+        .collection('users')
+        .doc(_uid)
+        .collection('followRequests')
+        .doc(fromUid)
+        .delete();
+  }
+
+  // get pending follow requests
+  Future<List<Map<String, dynamic>>> getFollowRequests() async {
+    final snapshot = await _db
+        .collection('users')
+        .doc(_uid)
+        .collection('followRequests')
+        .where('status', isEqualTo: 'pending')
+        .orderBy('createdAt', descending: true)
+        .get();
+
+    return snapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
+  }
+
+  // check if following
   Future<bool> isFollowing(String targetUid) async {
     final doc = await _db
         .collection('users')

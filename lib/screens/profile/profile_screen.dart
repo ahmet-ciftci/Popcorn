@@ -3,7 +3,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../settings/settings_screen.dart';
+import '../profile/notifications_screen.dart';
 import '../../services/firestore_service.dart';
+import '../../services/notification_service.dart';
 import '../../services/tmdb_service.dart';
 import '../../models/movie.dart';
 import '../movie_detail/movie_detail_screen.dart';
@@ -21,6 +23,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen>
     with SingleTickerProviderStateMixin {
   final _firestoreService = FirestoreService();
+  final _notifService = NotificationService();
 
   User? get _user => FirebaseAuth.instance.currentUser;
   String get _username => _user?.displayName ?? 'username';
@@ -36,6 +39,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   List<Map<String, dynamic>?> _favorites = [null, null, null, null];
   int _followersCount = 0;
   int _followingCount = 0;
+  int _unreadCount = 0;
   bool _loading = true;
 
   @override
@@ -60,6 +64,9 @@ class _ProfileScreenState extends State<ProfileScreen>
         .get();
     final userData = userDoc.data();
 
+    // load unread notification count
+    final unreadCount = await _notifService.getUnreadCount();
+
     if (mounted) {
       setState(() {
         _watched = results[0] as List<Map<String, dynamic>>;
@@ -68,6 +75,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         _favorites = results[3] as List<Map<String, dynamic>?>;
         _followersCount = userData?['followersCount'] ?? 0;
         _followingCount = userData?['followingCount'] ?? 0;
+        _unreadCount = unreadCount;
         _loading = false;
       });
     }
@@ -76,6 +84,11 @@ class _ProfileScreenState extends State<ProfileScreen>
   Future<void> _loadFavorites() async {
     final favorites = await _firestoreService.getFavorites();
     if (mounted) setState(() => _favorites = favorites);
+  }
+
+  Future<void> _loadUnreadCount() async {
+    final count = await _notifService.getUnreadCount();
+    if (mounted) setState(() => _unreadCount = count);
   }
 
   void _onAddFavorite() {
@@ -169,7 +182,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                         emptyMessage: 'no watched films yet',
                         label: 'FILMS'),
                     _ListsTab(
-                        lists: _lists, onListsChanged: _loadAll),
+                        lists: _lists,
+                        onListsChanged: _loadAll),
                     _MovieGridTab(
                         movies: _watchlist,
                         emptyMessage: 'no watchlist yet',
@@ -188,23 +202,71 @@ class _ProfileScreenState extends State<ProfileScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+
         // top bar
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           child: Stack(
             alignment: Alignment.center,
             children: [
+              // username ortada
               Text(_username,
                   style: const TextStyle(
                       color: Colors.white,
                       fontSize: 17,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0.3)),
+
+              // sol: bildirim çanı
+              Align(
+                alignment: Alignment.centerLeft,
+                child: GestureDetector(
+                  onTap: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const NotificationsScreen()),
+                    );
+                    // ekrandan dönünce badge'i güncelle
+                    _loadUnreadCount();
+                  },
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      const Icon(Icons.notifications_outlined,
+                          color: Colors.white, size: 24),
+                      if (_unreadCount > 0)
+                        Positioned(
+                          top: -4,
+                          right: -4,
+                          child: Container(
+                            width: 16,
+                            height: 16,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFE50914),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: Text(
+                                '$_unreadCount',
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // sağ: settings
               Align(
                 alignment: Alignment.centerRight,
                 child: GestureDetector(
-                  onTap: () => Navigator.push(
-                      context,
+                  onTap: () => Navigator.push(context,
                       MaterialPageRoute(
                           builder: (_) => const SettingsScreen())),
                   child: const Icon(Icons.settings_outlined,
@@ -237,11 +299,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                     _StatItem(
                         label: 'watched', value: '${_watched.length}'),
                     _StatItem(
-                        label: 'followers',
-                        value: '$_followersCount'),
+                        label: 'followers', value: '$_followersCount'),
                     _StatItem(
-                        label: 'following',
-                        value: '$_followingCount'),
+                        label: 'following', value: '$_followingCount'),
                   ],
                 ),
               ),
@@ -363,9 +423,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                               color: const Color(0xFF2A2A2A),
                               width: 0.5),
                         ),
-                        child: _favorites
-                            .indexWhere((f) => f == null) ==
-                            i
+                        child:
+                        _favorites.indexWhere((f) => f == null) == i
                             ? Icon(Icons.add,
                             color: Colors.grey.shade700, size: 20)
                             : null,
@@ -470,8 +529,8 @@ class _FavoritesSearchSheetState extends State<_FavoritesSearchSheet> {
                 cursorColor: const Color(0xFFE50914),
                 decoration: InputDecoration(
                   hintText: 'search films...',
-                  hintStyle: TextStyle(
-                      color: Colors.grey.shade600, fontSize: 14),
+                  hintStyle:
+                  TextStyle(color: Colors.grey.shade600, fontSize: 14),
                   prefixIcon: Icon(Icons.search,
                       color: Colors.grey.shade600, size: 20),
                   border: InputBorder.none,
@@ -533,29 +592,25 @@ class _FavoritesSearchSheetState extends State<_FavoritesSearchSheet> {
                                   Container(
                                     width: 36,
                                     height: 54,
-                                    color: const Color(
-                                        0xFF2C2C2E),
+                                    color: const Color(0xFF2C2C2E),
                                   ),
                               errorWidget: (_, __, ___) =>
                                   Container(
                                     width: 36,
                                     height: 54,
-                                    color: const Color(
-                                        0xFF2C2C2E),
+                                    color: const Color(0xFF2C2C2E),
                                     child: Icon(Icons.movie,
-                                        color: Colors
-                                            .grey.shade700,
+                                        color:
+                                        Colors.grey.shade700,
                                         size: 16),
                                   ),
                             )
                                 : Container(
                               width: 36,
                               height: 54,
-                              color:
-                              const Color(0xFF2C2C2E),
+                              color: const Color(0xFF2C2C2E),
                               child: Icon(Icons.movie,
-                                  color:
-                                  Colors.grey.shade700,
+                                  color: Colors.grey.shade700,
                                   size: 16),
                             ),
                           ),
@@ -569,17 +624,14 @@ class _FavoritesSearchSheetState extends State<_FavoritesSearchSheet> {
                                     style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 13,
-                                        fontWeight:
-                                        FontWeight.w500),
+                                        fontWeight: FontWeight.w500),
                                     maxLines: 2,
-                                    overflow:
-                                    TextOverflow.ellipsis),
+                                    overflow: TextOverflow.ellipsis),
                                 if (year.isNotEmpty) ...[
                                   const SizedBox(height: 3),
                                   Text(year,
                                       style: TextStyle(
-                                          color: Colors
-                                              .grey.shade600,
+                                          color: Colors.grey.shade600,
                                           fontSize: 11)),
                                 ],
                               ],
@@ -625,8 +677,7 @@ class _MovieGridTab extends StatelessWidget {
     if (movies.isEmpty) {
       return Center(
         child: Text(emptyMessage,
-            style:
-            TextStyle(color: Colors.grey.shade700, fontSize: 14)),
+            style: TextStyle(color: Colors.grey.shade700, fontSize: 14)),
       );
     }
 
@@ -660,8 +711,8 @@ class _MovieGridTab extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
-                        border: Border.all(
-                            color: const Color(0xFFE50914)),
+                        border:
+                        Border.all(color: const Color(0xFFE50914)),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: const Row(
@@ -671,8 +722,7 @@ class _MovieGridTab extends StatelessWidget {
                           SizedBox(width: 5),
                           Text('See All',
                               style: TextStyle(
-                                  color: Color(0xFFE50914),
-                                  fontSize: 12)),
+                                  color: Color(0xFFE50914), fontSize: 12)),
                         ],
                       ),
                     ),
@@ -798,8 +848,7 @@ class _ListsTab extends StatelessWidget {
     if (lists.isEmpty) {
       return Center(
         child: Text('no lists yet',
-            style:
-            TextStyle(color: Colors.grey.shade700, fontSize: 14)),
+            style: TextStyle(color: Colors.grey.shade700, fontSize: 14)),
       );
     }
 
@@ -807,7 +856,8 @@ class _ListsTab extends StatelessWidget {
       behavior:
       ScrollConfiguration.of(context).copyWith(scrollbars: false),
       child: ListView.separated(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        padding:
+        const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         itemCount: lists.length,
         separatorBuilder: (_, __) => const SizedBox(height: 10),
         itemBuilder: (context, index) {
@@ -984,8 +1034,7 @@ class _StatItem extends StatelessWidget {
                 fontWeight: FontWeight.w700)),
         const SizedBox(height: 3),
         Text(label,
-            style:
-            TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
       ],
     );
   }

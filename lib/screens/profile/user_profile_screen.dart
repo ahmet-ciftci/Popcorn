@@ -26,7 +26,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
   late TabController _tabController;
 
-  bool _isFollowing = false;
+  // 'following', 'requested', 'none'
+  String _followStatus = 'none';
   bool _loading = true;
   Map<String, dynamic>? _profile;
   Map<String, String> _visibility = {};
@@ -51,12 +52,14 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
   Future<void> _loadAll() async {
     final profile = await _socialService.getUserProfile(widget.uid);
-    final isFollowing = await _socialService.isFollowing(widget.uid);
+    final followStatus = await _socialService.getFollowStatus(widget.uid);
 
     final visibilityData = profile?['visibility'];
     final visibility = visibilityData != null
         ? Map<String, String>.from(visibilityData)
         : <String, String>{};
+
+    final isFollowing = followStatus == 'following';
 
     final watchedVisible = _canSee(visibility['Watched List'] ?? 'Everyone', isFollowing);
     final watchlistVisible = _canSee(visibility['Watchlist'] ?? 'Everyone', isFollowing);
@@ -75,7 +78,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
     setState(() {
       _profile = profile;
-      _isFollowing = isFollowing;
+      _followStatus = followStatus;
       _visibility = visibility;
       _watched = watched;
       _watchlist = watchlist;
@@ -92,10 +95,18 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   }
 
   Future<void> _toggleFollow() async {
-    if (_isFollowing) {
+    if (_followStatus == 'following') {
+      // unfollow
       await _socialService.unfollow(widget.uid);
+      setState(() => _followStatus = 'none');
+    } else if (_followStatus == 'requested') {
+      // cancel request
+      await _socialService.cancelRequest(widget.uid);
+      setState(() => _followStatus = 'none');
     } else {
-      await _socialService.follow(widget.uid);
+      // follow or send request
+      final result = await _socialService.follow(widget.uid);
+      setState(() => _followStatus = result);
     }
     await _loadAll();
   }
@@ -116,10 +127,11 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     final followingCount = _profile?['followingCount'] ?? 0;
     final initial = username.isNotEmpty ? username[0].toUpperCase() : '?';
 
-    final watchedVisible = _canSee(_visibility['Watched List'] ?? 'Everyone', _isFollowing);
-    final watchlistVisible = _canSee(_visibility['Watchlist'] ?? 'Everyone', _isFollowing);
-    final listsVisible = _canSee(_visibility['Custom Lists'] ?? 'Everyone', _isFollowing);
-    final favoritesVisible = _canSee(_visibility['Favorites'] ?? 'Everyone', _isFollowing);
+    final isFollowing = _followStatus == 'following';
+    final watchedVisible = _canSee(_visibility['Watched List'] ?? 'Everyone', isFollowing);
+    final watchlistVisible = _canSee(_visibility['Watchlist'] ?? 'Everyone', isFollowing);
+    final listsVisible = _canSee(_visibility['Custom Lists'] ?? 'Everyone', isFollowing);
+    final favoritesVisible = _canSee(_visibility['Favorites'] ?? 'Everyone', isFollowing);
 
     return Scaffold(
       backgroundColor: const Color(0xFF0D0D0D),
@@ -200,17 +212,23 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(vertical: 9),
                       decoration: BoxDecoration(
-                        color: _isFollowing
+                        color: _followStatus == 'following'
+                            ? const Color(0xFF1E1E1E)
+                            : _followStatus == 'requested'
                             ? const Color(0xFF1E1E1E)
                             : const Color(0xFFE50914),
                         borderRadius: BorderRadius.circular(10),
-                        border: _isFollowing
+                        border: _followStatus != 'none'
                             ? Border.all(color: Colors.grey.shade800)
                             : null,
                       ),
                       child: Center(
                         child: Text(
-                          _isFollowing ? 'Following' : 'Follow',
+                          _followStatus == 'following'
+                              ? 'Following'
+                              : _followStatus == 'requested'
+                              ? 'Requested'
+                              : 'Follow',
                           style: const TextStyle(
                               color: Colors.white,
                               fontSize: 13,
@@ -235,11 +253,9 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                     children: List.generate(4, (i) {
                       final fav = _favorites[i];
                       final posterPath = fav?['posterPath'] as String?;
-                      final posterUrl =
-                      (posterPath != null && posterPath.isNotEmpty)
+                      final posterUrl = (posterPath != null && posterPath.isNotEmpty)
                           ? 'https://image.tmdb.org/t/p/w185$posterPath'
                           : '';
-
                       return Expanded(
                         child: Padding(
                           padding: EdgeInsets.only(right: i < 3 ? 8 : 0),
@@ -263,7 +279,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                 )
                     : _PrivateSection(
                   message: 'Favorites are private',
-                  isFollowing: _isFollowing,
+                  isFollowing: isFollowing,
                 ),
               ),
 
@@ -296,35 +312,15 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                 child: TabBarView(
                   controller: _tabController,
                   children: [
-                    // watched
                     watchedVisible
-                        ? _MovieGrid(
-                      movies: _watched,
-                      emptyMessage: 'no watched films yet',
-                    )
-                        : _PrivateSection(
-                      message: 'Watched list is private',
-                      isFollowing: _isFollowing,
-                    ),
-
-                    // lists
+                        ? _MovieGrid(movies: _watched, emptyMessage: 'no watched films yet')
+                        : _PrivateSection(message: 'Watched list is private', isFollowing: isFollowing),
                     listsVisible
                         ? _ListsTab(lists: _lists)
-                        : _PrivateSection(
-                      message: 'Lists are private',
-                      isFollowing: _isFollowing,
-                    ),
-
-                    // watchlist
+                        : _PrivateSection(message: 'Lists are private', isFollowing: isFollowing),
                     watchlistVisible
-                        ? _MovieGrid(
-                      movies: _watchlist,
-                      emptyMessage: 'no watchlist yet',
-                    )
-                        : _PrivateSection(
-                      message: 'Watchlist is private',
-                      isFollowing: _isFollowing,
-                    ),
+                        ? _MovieGrid(movies: _watchlist, emptyMessage: 'no watchlist yet')
+                        : _PrivateSection(message: 'Watchlist is private', isFollowing: isFollowing),
                   ],
                 ),
               ),
@@ -375,8 +371,7 @@ class _MovieGrid extends StatelessWidget {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) =>
-                    MovieDetailScreen(movieId: movie['tmdbId'] as int),
+                builder: (_) => MovieDetailScreen(movieId: movie['tmdbId'] as int),
               ),
             ),
             child: ClipRRect(
@@ -385,8 +380,7 @@ class _MovieGrid extends StatelessWidget {
                   ? Image.network(posterUrl, fit: BoxFit.cover)
                   : Container(
                 color: const Color(0xFF1A1A1A),
-                child: const Icon(Icons.movie_outlined,
-                    color: Colors.grey),
+                child: const Icon(Icons.movie_outlined, color: Colors.grey),
               ),
             ),
           );
@@ -400,7 +394,6 @@ class _MovieGrid extends StatelessWidget {
 
 class _ListsTab extends StatelessWidget {
   final List<Map<String, dynamic>> lists;
-
   const _ListsTab({required this.lists});
 
   @override
@@ -435,19 +428,15 @@ class _ListsTab extends StatelessWidget {
                     color: const Color(0xFFE50914).withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.list,
-                      color: Color(0xFFE50914), size: 18),
+                  child: const Icon(Icons.list, color: Color(0xFFE50914), size: 18),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(list['name'] ?? '',
                       style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500)),
+                          color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500)),
                 ),
-                Icon(Icons.chevron_right,
-                    color: Colors.grey.shade700, size: 20),
+                Icon(Icons.chevron_right, color: Colors.grey.shade700, size: 20),
               ],
             ),
           );
@@ -534,8 +523,7 @@ class _StatItem extends StatelessWidget {
             style: const TextStyle(
                 color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
         const SizedBox(height: 3),
-        Text(label,
-            style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+        Text(label, style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
       ],
     );
   }
@@ -558,8 +546,7 @@ class _SectionHeader extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                   letterSpacing: 1.0)),
           const SizedBox(width: 10),
-          Expanded(
-              child: Container(height: 0.5, color: const Color(0xFF2A2A2A))),
+          Expanded(child: Container(height: 0.5, color: const Color(0xFF2A2A2A))),
         ],
       ),
     );
