@@ -34,27 +34,6 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Account Preferences
-          _sectionLabel('Account Preferences'),
-          _settingsCard([
-            _settingsTile(
-              context,
-              icon: CupertinoIcons.person,
-              label: 'Account Preferences',
-              isLast: false,
-              onTap: () {},
-            ),
-            _settingsTile(
-              context,
-              icon: CupertinoIcons.lock,
-              label: 'Login & Security',
-              isLast: true,
-              onTap: () {},
-            ),
-          ]),
-
-          const SizedBox(height: 24),
-
           // Visibility
           _sectionLabel('Visibility'),
           _settingsCard([
