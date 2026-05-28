@@ -28,18 +28,16 @@ class SocialService {
 
   // follow or send request depending on target's privacy setting
   Future<String> follow(String targetUid) async {
-    // check target user's profile visibility
     final targetDoc = await _db.collection('users').doc(targetUid).get();
     final targetData = targetDoc.data();
     final visibility = targetData?['visibility'];
-    final profileVisibility = visibility?['Profile Visibility'] ?? 'Everyone';
+    final profileVisibility = visibility?['Profile Visibility'] ?? 'Public';
 
-    // get current user's username
     final currentDoc = await _db.collection('users').doc(_uid).get();
     final username = currentDoc.data()?['username'] ?? '';
 
-    if (profileVisibility == 'Everyone') {
-      // public profile — follow directly
+    // Public → direkt takip
+    if (profileVisibility == 'Public' || profileVisibility == 'Everyone') {
       final batch = _db.batch();
 
       batch.set(
@@ -58,8 +56,6 @@ class SocialService {
         _db.collection('users').doc(targetUid),
         {'followersCount': FieldValue.increment(1)},
       );
-
-      // send follow notification
       batch.set(
         _db.collection('notifications').doc(targetUid).collection('items').doc(),
         {
@@ -72,10 +68,10 @@ class SocialService {
       );
 
       await batch.commit();
-      return 'followed'; // directly followed
+      return 'followed';
 
     } else {
-      // private profile — send follow request
+      // Private → istek gönder
       await _db
           .collection('users')
           .doc(targetUid)
@@ -88,7 +84,6 @@ class SocialService {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // send follow request notification
       await _db
           .collection('notifications')
           .doc(targetUid)
@@ -102,7 +97,7 @@ class SocialService {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      return 'requested'; // request sent
+      return 'requested';
     }
   }
 
@@ -281,5 +276,59 @@ class SocialService {
         .orderBy('addedAt', descending: true)
         .get();
     return snapshot.docs.map((doc) => doc.data()).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> getFollowers(String uid) async {
+    final snapshot = await _db
+        .collection('users')
+        .doc(uid)
+        .collection('followers')
+        .orderBy('followedAt', descending: true)
+        .get();
+
+    List<Map<String, dynamic>> users = [];
+
+    for (final doc in snapshot.docs) {
+      final followerUid = doc.id;
+
+      final userDoc =
+      await _db.collection('users').doc(followerUid).get();
+
+      if (userDoc.exists) {
+        users.add({
+          'uid': userDoc.id,
+          ...userDoc.data()!,
+        });
+      }
+    }
+
+    return users;
+  }
+
+  Future<List<Map<String, dynamic>>> getFollowing(String uid) async {
+    final snapshot = await _db
+        .collection('users')
+        .doc(uid)
+        .collection('following')
+        .orderBy('followedAt', descending: true)
+        .get();
+
+    List<Map<String, dynamic>> users = [];
+
+    for (final doc in snapshot.docs) {
+      final followingUid = doc.id;
+
+      final userDoc =
+      await _db.collection('users').doc(followingUid).get();
+
+      if (userDoc.exists) {
+        users.add({
+          'uid': userDoc.id,
+          ...userDoc.data()!,
+        });
+      }
+    }
+
+    return users;
   }
 }

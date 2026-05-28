@@ -26,6 +26,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Future<void> _load() async {
     final notifs = await _notifService.getNotifications();
     await _notifService.markAllRead();
+
     setState(() {
       _notifications = notifs;
       _loading = false;
@@ -37,6 +38,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     try {
       final date = (createdAt as dynamic).toDate() as DateTime;
       final diff = DateTime.now().difference(date);
+
       if (diff.inMinutes < 1) return 'just now';
       if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
       if (diff.inHours < 24) return '${diff.inHours} hours ago';
@@ -46,7 +48,22 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
-  // group notifications by time
+  String _buildActionText(Map<String, dynamic> notif) {
+    final type = notif['type'];
+    final username = notif['fromUsername'] ?? '';
+
+    switch (type) {
+      case 'follow':
+        return 'started following you';
+      case 'follow_request':
+        return 'wants to follow you';
+      case 'follow_accepted':
+        return 'accepted your follow request';
+      default:
+        return '';
+    }
+  }
+
   Map<String, List<Map<String, dynamic>>> _grouped() {
     final now = DateTime.now();
     final requests = <Map<String, dynamic>>[];
@@ -55,7 +72,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final older = <Map<String, dynamic>>[];
 
     for (final n in _notifications) {
-      // follow requests go to top section
       if (n['type'] == 'follow_request') {
         requests.add(n);
         continue;
@@ -72,6 +88,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       }
 
       final diff = now.difference(date).inDays;
+
       if (diff <= 7) {
         last7.add(n);
       } else if (diff <= 30) {
@@ -116,17 +133,24 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         title: const Text(
           'Notifications',
           style: TextStyle(
-              color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
       body: _loading
           ? const Center(
-          child: CircularProgressIndicator(color: Color(0xFFE50914)))
+        child: CircularProgressIndicator(color: Color(0xFFE50914)),
+      )
           : _notifications.isEmpty
           ? Center(
         child: Text(
           'no notifications yet',
-          style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+          style: TextStyle(
+            color: Colors.grey.shade600,
+            fontSize: 14,
+          ),
         ),
       )
           : ListView(
@@ -135,7 +159,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // section label
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                 child: Text(
@@ -158,10 +181,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     : '?';
                 final isRead = notif['read'] ?? true;
                 final timeAgo = _timeAgo(notif['createdAt']);
-                final isRequest = notif['type'] == 'follow_request';
+                final isRequest =
+                    notif['type'] == 'follow_request';
+
+                final actionText = _buildActionText(notif);
 
                 if (isRequest) {
-                  // follow request card with accept/decline
                   return Container(
                     margin: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 4),
@@ -170,7 +195,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       color: const Color(0xFF1A1A1A),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                          color: const Color(0xFF2A2A2A), width: 0.5),
+                        color: const Color(0xFF2A2A2A),
+                        width: 0.5,
+                      ),
                     ),
                     child: Column(
                       children: [
@@ -180,11 +207,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                               radius: 22,
                               backgroundColor:
                               const Color(0xFFE50914),
-                              child: Text(initial,
-                                  style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700)),
+                              child: Text(
+                                initial,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
@@ -197,24 +227,30 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                       TextSpan(
                                         text: username,
                                         style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 13,
-                                            fontWeight:
-                                            FontWeight.w600),
+                                          color: Colors.white,
+                                          fontSize: 13,
+                                          fontWeight:
+                                          FontWeight.w600,
+                                        ),
                                       ),
                                       const TextSpan(
-                                        text: ' wants to follow you',
+                                        text:
+                                        ' wants to follow you',
                                         style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 13),
+                                          color: Colors.white,
+                                          fontSize: 13,
+                                        ),
                                       ),
                                     ]),
                                   ),
                                   const SizedBox(height: 3),
-                                  Text(timeAgo,
-                                      style: TextStyle(
-                                          color: Colors.grey.shade600,
-                                          fontSize: 11)),
+                                  Text(
+                                    timeAgo,
+                                    style: TextStyle(
+                                      color: Colors.grey.shade600,
+                                      fontSize: 11,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -236,12 +272,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                     BorderRadius.circular(8),
                                   ),
                                   child: const Center(
-                                    child: Text('Accept',
-                                        style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 13,
-                                            fontWeight:
-                                            FontWeight.w600)),
+                                    child: Text(
+                                      'Accept',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
@@ -260,12 +298,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                     BorderRadius.circular(8),
                                   ),
                                   child: Center(
-                                    child: Text('Decline',
-                                        style: TextStyle(
-                                            color: Colors.grey.shade400,
-                                            fontSize: 13,
-                                            fontWeight:
-                                            FontWeight.w600)),
+                                    child: Text(
+                                      'Decline',
+                                      style: TextStyle(
+                                        color: Colors.grey.shade400,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
@@ -277,7 +317,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   );
                 }
 
-                // normal follow notification
                 return Container(
                   color: isRead
                       ? Colors.transparent
@@ -288,12 +327,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     children: [
                       CircleAvatar(
                         radius: 22,
-                        backgroundColor: const Color(0xFFE50914),
-                        child: Text(initial,
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700)),
+                        backgroundColor:
+                        const Color(0xFFE50914),
+                        child: Text(
+                          initial,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -306,23 +349,28 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                 TextSpan(
                                   text: username,
                                   style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600),
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
-                                const TextSpan(
-                                  text: ' started following you',
-                                  style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 13),
+                                TextSpan(
+                                  text: ' $actionText',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                  ),
                                 ),
                               ]),
                             ),
                             const SizedBox(height: 3),
-                            Text(timeAgo,
-                                style: TextStyle(
-                                    color: Colors.grey.shade600,
-                                    fontSize: 11)),
+                            Text(
+                              timeAgo,
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
+                                fontSize: 11,
+                              ),
+                            ),
                           ],
                         ),
                       ),

@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../settings/visibility_screen.dart';
+import '../auth/login_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -14,18 +15,25 @@ class SettingsScreen extends StatelessWidget {
         backgroundColor: const Color(0xFF0D0D0D),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(CupertinoIcons.chevron_back, color: Colors.white, size: 20),
+          icon: const Icon(
+            CupertinoIcons.chevron_back,
+            color: Colors.white,
+            size: 20,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Settings',
-          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-
           // Account Preferences
           _sectionLabel('Account Preferences'),
           _settingsCard([
@@ -57,7 +65,9 @@ class SettingsScreen extends StatelessWidget {
               isLast: true,
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const VisibilityScreen()),
+                MaterialPageRoute(
+                  builder: (_) => const VisibilityScreen(),
+                ),
               ),
             ),
           ]),
@@ -75,13 +85,32 @@ class SettingsScreen extends StatelessWidget {
                   color: const Color(0xFFE50914).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(CupertinoIcons.square_arrow_left, size: 16, color: Color(0xFFE50914)),
+                child: const Icon(
+                  CupertinoIcons.square_arrow_left,
+                  size: 16,
+                  color: Color(0xFFE50914),
+                ),
               ),
               title: const Text(
                 'Log Out',
-                style: TextStyle(color: Color(0xFFE50914), fontSize: 15, fontWeight: FontWeight.w500),
+                style: TextStyle(
+                  color: Color(0xFFE50914),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-              onTap: () => FirebaseAuth.instance.signOut(),
+              onTap: () async {
+                await FirebaseAuth.instance.signOut();
+
+                if (context.mounted) {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(
+                      builder: (_) => const LoginScreen(),
+                    ),
+                        (route) => false,
+                  );
+                }
+              },
             ),
           ]),
 
@@ -140,13 +169,20 @@ class SettingsScreen extends StatelessWidget {
             label,
             style: const TextStyle(color: Colors.white, fontSize: 14),
           ),
-          trailing: Icon(CupertinoIcons.chevron_right, size: 14, color: Colors.grey.shade700),
+          trailing: Icon(
+            CupertinoIcons.chevron_right,
+            size: 14,
+            color: Colors.grey.shade700,
+          ),
           onTap: onTap,
         ),
         if (!isLast)
           Padding(
             padding: const EdgeInsets.only(left: 62),
-            child: Container(height: 0.5, color: const Color(0xFF2C2C2E)),
+            child: Container(
+              height: 0.5,
+              color: const Color(0xFF2C2C2E),
+            ),
           ),
       ],
     );

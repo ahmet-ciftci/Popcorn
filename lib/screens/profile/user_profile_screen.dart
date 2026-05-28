@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/social_service.dart';
 import '../../constants/api_constants.dart';
 import '../movie_detail/movie_detail_screen.dart';
-
+import 'followers_following_screen.dart';
 class UserProfileScreen extends StatefulWidget {
   final String uid;
   final String username;
@@ -91,6 +91,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   bool _canSee(String setting, bool isFollowing) {
     if (setting == 'Everyone') return true;
     if (setting == 'Friends' && isFollowing) return true;
+    if (setting == 'Only Me') return false;
     return false;
   }
 
@@ -120,6 +121,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           child: CircularProgressIndicator(color: Color(0xFFE50914)),
         ),
       );
+
     }
 
     final username = _profile?['username'] ?? widget.username;
@@ -132,6 +134,16 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     final watchlistVisible = _canSee(_visibility['Watchlist'] ?? 'Everyone', isFollowing);
     final listsVisible = _canSee(_visibility['Custom Lists'] ?? 'Everyone', isFollowing);
     final favoritesVisible = _canSee(_visibility['Favorites'] ?? 'Everyone', isFollowing);
+
+    final followersVisible = _canSee(
+      _visibility['Followers List'] ?? 'Everyone',
+      isFollowing,
+    );
+
+    final followingVisible = _canSee(
+      _visibility['Following List'] ?? 'Everyone',
+      isFollowing,
+    );
 
     return Scaffold(
       backgroundColor: const Color(0xFF0D0D0D),
@@ -190,8 +202,47 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                               label: 'watched',
                               value: watchedVisible ? '${_watched.length}' : '—',
                             ),
-                            _StatItem(label: 'followers', value: '$followersCount'),
-                            _StatItem(label: 'following', value: '$followingCount'),
+                            GestureDetector(
+                              onTap: () {
+                                if (!followersVisible) return;
+
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => FollowersFollowingScreen(
+                                      uid: widget.uid,
+                                      title: 'Followers',
+                                      isFollowers: true,
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: _StatItem(
+                                label: 'followers',
+                                value: '$followersCount',
+                              ),
+                            ),
+
+                            GestureDetector(
+                              onTap: () {
+                                if (!followingVisible) return;
+
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => FollowersFollowingScreen(
+                                      uid: widget.uid,
+                                      title: 'Following',
+                                      isFollowers: false,
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: _StatItem(
+                                label: 'following',
+                                value: '$followingCount',
+                              ),
+                            ),
                           ],
                         ),
                       ),

@@ -14,15 +14,15 @@ class _VisibilityScreenState extends State<VisibilityScreen> {
   final _db = FirebaseFirestore.instance;
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
 
-  // default values
   final Map<String, String> _settings = {
-    'Profile Visibility': 'Everyone',
+    'Profile Visibility': 'Public',
     'Watched List': 'Everyone',
     'Watchlist': 'Everyone',
     'Reviews': 'Everyone',
     'Favorites': 'Everyone',
     'Custom Lists': 'Everyone',
     'Followers List': 'Everyone',
+    'Following List': 'Everyone',
   };
 
   bool _loading = true;
@@ -33,31 +33,75 @@ class _VisibilityScreenState extends State<VisibilityScreen> {
     _loadSettings();
   }
 
-  // load saved settings from Firestore
   Future<void> _loadSettings() async {
     final doc = await _db.collection('users').doc(_uid).get();
     final data = doc.data();
-
     if (data != null && data['visibility'] != null) {
       final saved = Map<String, String>.from(data['visibility']);
       setState(() {
         saved.forEach((key, value) {
-          if (_settings.containsKey(key)) {
-            _settings[key] = value;
-          }
+          if (_settings.containsKey(key)) _settings[key] = value;
         });
       });
     }
-
     setState(() => _loading = false);
   }
 
-  // save a single setting to Firestore
   Future<void> _saveSetting(String key, String value) async {
     await _db.collection('users').doc(_uid).update({
       'visibility.$key': value,
     });
     setState(() => _settings[key] = value);
+  }
+
+  List<_VisibilityOption> _optionsFor(String key) {
+    if (key == 'Profile Visibility') {
+      return [
+        _VisibilityOption(
+          icon: CupertinoIcons.globe,
+          label: 'Public',
+          description: 'Anyone can follow you directly',
+        ),
+        _VisibilityOption(
+          icon: CupertinoIcons.lock,
+          label: 'Private',
+          description: 'Others must send a follow request',
+        ),
+      ];
+    }
+
+    if (key == 'Followers List' || key == 'Following List') {
+      return [
+        _VisibilityOption(
+          icon: CupertinoIcons.globe,
+          label: 'Everyone',
+          description: 'Visible to all users',
+        ),
+        _VisibilityOption(
+          icon: CupertinoIcons.person_2,
+          label: 'Friends',
+          description: 'Only people who follow you',
+        ),
+      ];
+    }
+
+    return [
+      _VisibilityOption(
+        icon: CupertinoIcons.globe,
+        label: 'Everyone',
+        description: 'Visible to all users',
+      ),
+      _VisibilityOption(
+        icon: CupertinoIcons.person_2,
+        label: 'Friends',
+        description: 'Only people who follow you',
+      ),
+      _VisibilityOption(
+        icon: CupertinoIcons.lock,
+        label: 'Only Me',
+        description: 'Completely private',
+      ),
+    ];
   }
 
   @override
@@ -74,11 +118,9 @@ class _VisibilityScreenState extends State<VisibilityScreen> {
               color: Colors.white, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Visibility',
-          style: TextStyle(
-              color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
-        ),
+        title: const Text('Visibility',
+            style: TextStyle(
+                color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
       ),
       body: _loading
           ? const Center(
@@ -96,28 +138,22 @@ class _VisibilityScreenState extends State<VisibilityScreen> {
               children: List.generate(keys.length, (i) {
                 final key = keys[i];
                 final isLast = i == keys.length - 1;
-
                 return Column(
                   children: [
                     ListTile(
-                      title: Text(
-                        key,
-                        style: const TextStyle(
-                            color: Colors.white, fontSize: 14),
-                      ),
+                      title: Text(key,
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 14)),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            _settings[key]!,
-                            style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 13),
-                          ),
+                          Text(_settings[key]!,
+                              style: TextStyle(
+                                  color: Colors.grey.shade600,
+                                  fontSize: 13)),
                           const SizedBox(width: 4),
                           Icon(CupertinoIcons.chevron_right,
-                              size: 13,
-                              color: Colors.grey.shade700),
+                              size: 13, color: Colors.grey.shade700),
                         ],
                       ),
                       onTap: () async {
@@ -127,20 +163,18 @@ class _VisibilityScreenState extends State<VisibilityScreen> {
                             builder: (_) => _VisibilityOptionScreen(
                               title: key,
                               currentValue: _settings[key]!,
+                              options: _optionsFor(key),
                             ),
                           ),
                         );
-                        if (result != null) {
-                          await _saveSetting(key, result);
-                        }
+                        if (result != null) await _saveSetting(key, result);
                       },
                     ),
                     if (!isLast)
                       Padding(
                         padding: const EdgeInsets.only(left: 16),
                         child: Container(
-                            height: 0.5,
-                            color: const Color(0xFF2C2C2E)),
+                            height: 0.5, color: const Color(0xFF2C2C2E)),
                       ),
                   ],
                 );
@@ -153,15 +187,23 @@ class _VisibilityScreenState extends State<VisibilityScreen> {
   }
 }
 
-// ── Option screen — Everyone / Friends / Only Me ──
+class _VisibilityOption {
+  final IconData icon;
+  final String label;
+  final String description;
+  _VisibilityOption(
+      {required this.icon, required this.label, required this.description});
+}
 
 class _VisibilityOptionScreen extends StatefulWidget {
   final String title;
   final String currentValue;
+  final List<_VisibilityOption> options;
 
   const _VisibilityOptionScreen({
     required this.title,
     required this.currentValue,
+    required this.options,
   });
 
   @override
@@ -190,11 +232,9 @@ class _VisibilityOptionScreenState extends State<_VisibilityOptionScreen> {
               color: Colors.white, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
-          widget.title,
-          style: const TextStyle(
-              color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
-        ),
+        title: Text(widget.title,
+            style: const TextStyle(
+                color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
@@ -207,32 +247,63 @@ class _VisibilityOptionScreenState extends State<_VisibilityOptionScreen> {
               ),
               clipBehavior: Clip.hardEdge,
               child: Column(
-                children: [
-                  _optionTile(
-                    icon: CupertinoIcons.globe,
-                    label: 'Everyone',
-                    description: 'Visible to all users',
-                    isLast: false,
-                  ),
-                  _optionTile(
-                    icon: CupertinoIcons.person_2,
-                    label: 'Friends',
-                    description: 'Only your connections',
-                    isLast: false,
-                  ),
-                  _optionTile(
-                    icon: CupertinoIcons.lock,
-                    label: 'Only Me',
-                    description: 'Completely private',
-                    isLast: true,
-                  ),
-                ],
+                children: List.generate(widget.options.length, (i) {
+                  final option = widget.options[i];
+                  final isLast = i == widget.options.length - 1;
+                  final isSelected = _selected == option.label;
+
+                  return Column(
+                    children: [
+                      ListTile(
+                        leading: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2C2C2E),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(option.icon, size: 16, color: Colors.grey),
+                        ),
+                        title: Text(option.label,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500)),
+                        subtitle: Text(option.description,
+                            style: TextStyle(
+                                color: Colors.grey.shade600, fontSize: 12)),
+                        trailing: Container(
+                          width: 22,
+                          height: 22,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: isSelected
+                                ? const Color(0xFFE50914)
+                                : Colors.transparent,
+                            border: isSelected
+                                ? null
+                                : Border.all(
+                                color: Colors.grey.shade700, width: 1.5),
+                          ),
+                          child: isSelected
+                              ? const Icon(Icons.check,
+                              size: 14, color: Colors.white)
+                              : null,
+                        ),
+                        onTap: () => setState(() => _selected = option.label),
+                      ),
+                      if (!isLast)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 62),
+                          child: Container(
+                              height: 0.5, color: const Color(0xFF2C2C2E)),
+                        ),
+                    ],
+                  );
+                }),
               ),
             ),
-
             const SizedBox(height: 24),
-
-            // save button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -243,72 +314,16 @@ class _VisibilityOptionScreenState extends State<_VisibilityOptionScreen> {
                       borderRadius: BorderRadius.circular(12)),
                 ),
                 onPressed: () => Navigator.pop(context, _selected),
-                child: const Text(
-                  'Save',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600),
-                ),
+                child: const Text('Save',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600)),
               ),
             ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _optionTile({
-    required IconData icon,
-    required String label,
-    required String description,
-    required bool isLast,
-  }) {
-    final isSelected = _selected == label;
-
-    return Column(
-      children: [
-        ListTile(
-          leading: Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: const Color(0xFF2C2C2E),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, size: 16, color: Colors.grey),
-          ),
-          title: Text(
-            label,
-            style: const TextStyle(
-                color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
-          ),
-          subtitle: Text(
-            description,
-            style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-          ),
-          trailing: Container(
-            width: 22,
-            height: 22,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isSelected ? const Color(0xFFE50914) : Colors.transparent,
-              border: isSelected
-                  ? null
-                  : Border.all(color: Colors.grey.shade700, width: 1.5),
-            ),
-            child: isSelected
-                ? const Icon(Icons.check, size: 14, color: Colors.white)
-                : null,
-          ),
-          onTap: () => setState(() => _selected = label),
-        ),
-        if (!isLast)
-          Padding(
-            padding: const EdgeInsets.only(left: 62),
-            child: Container(height: 0.5, color: const Color(0xFF2C2C2E)),
-          ),
-      ],
     );
   }
 }
