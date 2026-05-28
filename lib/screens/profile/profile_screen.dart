@@ -12,6 +12,7 @@ import '../movie_detail/movie_detail_screen.dart';
 import 'list_detail_screen.dart';
 import 'edit_profile_sheet.dart';
 import 'share_profile_sheet.dart';
+import '../profile/followers_following_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -203,81 +204,6 @@ class _ProfileScreenState extends State<ProfileScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
 
-        // top bar
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              // username ortada
-              Text(_username,
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.3)),
-
-              // sol: bildirim çanı
-              Align(
-                alignment: Alignment.centerLeft,
-                child: GestureDetector(
-                  onTap: () async {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const NotificationsScreen()),
-                    );
-                    // ekrandan dönünce badge'i güncelle
-                    _loadUnreadCount();
-                  },
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      const Icon(Icons.notifications_outlined,
-                          color: Colors.white, size: 24),
-                      if (_unreadCount > 0)
-                        Positioned(
-                          top: -4,
-                          right: -4,
-                          child: Container(
-                            width: 16,
-                            height: 16,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFE50914),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Center(
-                              child: Text(
-                                '$_unreadCount',
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w700),
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // sağ: settings
-              Align(
-                alignment: Alignment.centerRight,
-                child: GestureDetector(
-                  onTap: () => Navigator.push(context,
-                      MaterialPageRoute(
-                          builder: (_) => const SettingsScreen())),
-                  child: const Icon(Icons.settings_outlined,
-                      color: Colors.white, size: 22),
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        // avatar + stats
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Row(
@@ -298,16 +224,41 @@ class _ProfileScreenState extends State<ProfileScreen>
                   children: [
                     _StatItem(
                         label: 'watched', value: '${_watched.length}'),
-                    _StatItem(
-                        label: 'followers', value: '$_followersCount'),
-                    _StatItem(
-                        label: 'following', value: '$_followingCount'),
+                    GestureDetector(
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => FollowersFollowingScreen(
+                            uid: _user!.uid,
+                            title: 'Followers',
+                            isFollowers: true,
+                          ),
+                        ),
+                      ),
+                      child: _StatItem(
+                          label: 'followers', value: '$_followersCount'),
+                    ),
+                    GestureDetector(
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => FollowersFollowingScreen(
+                            uid: _user!.uid,
+                            title: 'Following',
+                            isFollowers: false,
+                          ),
+                        ),
+                      ),
+                      child: _StatItem(
+                          label: 'following', value: '$_followingCount'),
+                    ),
                   ],
                 ),
               ),
             ],
           ),
         ),
+
 
         const SizedBox(height: 12),
 
