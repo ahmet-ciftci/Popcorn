@@ -3,6 +3,7 @@ import '../../models/movie.dart';
 import '../../services/tmdb_service.dart';
 import '../movie_detail/movie_detail_screen.dart';
 import '../mood/mood_browse_screen.dart';
+import '../feed/feed_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   HomeScreen({super.key});
@@ -72,17 +73,33 @@ class _HomeScreenState extends State<HomeScreen> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  IconButton(
-                    icon: Icon(Icons.auto_awesome, color: Colors.white),
-                    tooltip: 'Moods',
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => MoodBrowseScreen(),
-                        ),
-                      );
-                    },
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.dynamic_feed, color: Colors.white),
+                        tooltip: 'Feed',
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => FeedScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.auto_awesome, color: Colors.white),
+                        tooltip: 'Moods',
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => MoodBrowseScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                   ),
                 ],
               ),
