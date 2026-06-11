@@ -3,6 +3,7 @@ import '../../models/movie.dart';
 import '../../services/tmdb_service.dart';
 import '../movie_detail/movie_detail_screen.dart';
 import '../mood/mood_browse_screen.dart';
+import '../../services/blend_service.dart';
 
 class HomeScreen extends StatefulWidget {
   HomeScreen({super.key});
@@ -126,6 +127,29 @@ class _HomeScreenState extends State<HomeScreen> {
                 backgroundColor: Color(0xFFE50914),
               ),
               child: Text('Retry'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE50914)),
+              onPressed: () async {
+                final blend = BlendService();
+
+                final sessionId = await blend.createSession('Movie Night');
+                print('Session created: $sessionId');
+
+                await blend.addMovieToPool(sessionId,
+                  tmdbId: 157336,
+                  title: 'Interstellar',
+                  posterPath: '/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg',
+                );
+                print('Movie added to pool');
+
+                await blend.vote(sessionId, 157336, true);
+                print('Vote cast');
+
+                final results = await blend.getRankedResults(sessionId);
+                print('Results: $results');
+              },
+              child: const Text('Test Blend'),
             ),
           ],
         ),
