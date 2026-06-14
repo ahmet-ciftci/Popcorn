@@ -184,7 +184,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         const SizedBox(height: 6),
         const Text(
-          'BLEND  •  SWIPE  •  MATCH',
+          'BLEND  •  VOTE  •  MATCH',
           style: TextStyle(
             color: Color(0xFF666666),
             fontSize: 11,

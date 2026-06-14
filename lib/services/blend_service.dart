@@ -24,6 +24,11 @@ class BlendService {
     });
   }
 
+  // delete a session (only the creator should do this)
+  Future<void> deleteSession(String sessionId) async {
+    await _db.collection('blendSessions').doc(sessionId).delete();
+  }
+
   // get session info
   Future<Map<String, dynamic>?> getSession(String sessionId) async {
     final doc = await _db.collection('blendSessions').doc(sessionId).get();
